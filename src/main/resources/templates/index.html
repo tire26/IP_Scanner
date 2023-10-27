@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Сканирование SSL</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="display-4">Сканирование SSL-сертификатов</h1>
+    <form th:action="@{/scan}" method="get" id="scanForm">
+        <div class="form-group mb-3">
+            <label for="startIP">диапазон IP-адресов:</label>
+            <input type="text" class="form-control" name="startIP" id="startIP" required>
+        </div>
+        <div class="form-group mb-3">
+            <label for="numThreads">Количество потоков:</label>
+            <input type="number" class="form-control" name="numThreads" id="numThreads" min="1" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Начать сканирование</button>
+        <!-- Вставляем сообщение с использованием Thymeleaf -->
+        <p th:style="'color: green;'" th:text="${message}"></p>
+    </form>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+</body>
+</html>
