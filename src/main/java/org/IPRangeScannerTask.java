@@ -19,12 +19,28 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-public class SSLScanner {
+class IPRangeScannerTask implements Runnable {
+    private final List<String> ips;
+
+    public IPRangeScannerTask(List<String> ips) {
+        this.ips = ips;
+    }
+
+    @Override
+    public void run() {
+        Map<String, String> domainNames = new HashMap<>();
+        for (String ip : ips) {
+            Set<String> scannedDomains = scanSSLDomains(ip);
+            if (scannedDomains != null) {
+                scannedDomains.stream().forEach(sd -> {
+                    domainNames.put(ip, sd);
+                });
+            }
+        }
+        FileUtil.saveDomainNamesToFile(domainNames);
+    }
 
     public static final String PEER_CERTIFICATES = "PEER_CERTIFICATES";
 
@@ -68,6 +84,7 @@ public class SSLScanner {
                         for (List<?> subjectAlternativeName : subjectAlternativeNames) {
                             if (subjectAlternativeName.get(0).equals(2)) {
                                 domain.add(subjectAlternativeName.get(1).toString());
+                                System.out.println("Domain: " + subjectAlternativeName.get(1));
                             }
                         }
                     }

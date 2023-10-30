@@ -1,77 +1,75 @@
 package org;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class IPRangeScannerDistributor {
 
-    public static void scanIPRange(String startIP, String range, int numThreads) {
+    public static void scanIPRange(String ipWithMask, int numThreads) {
         try {
-            long start = ipToLong(startIP);
-            long rangeSize = Long.parseLong(range);
-            long end = start + rangeSize;
-            long subRangeSize = rangeSize / numThreads;
+            List<String> ips = getIps(ipWithMask);
+            if (ips == null) {
+                System.out.println("Incorrect ip");
+                return;
+            }
+            int subRangeSize = ips.size() / numThreads;
 
             ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
             for (int i = 0; i < numThreads; i++) {
-                long subRangeStart = start + i * subRangeSize;
-                long subRangeEnd = (i == numThreads - 1) ? end : subRangeStart + subRangeSize - 1;
+                int rightBound = (i + 1) * subRangeSize;
+                if (rightBound > ips.size())
+                    rightBound = ips.size();
 
-                Runnable task = new IPRangeScannerTask(longToIP(subRangeStart), longToIP(subRangeEnd));
+                List<String> threadIps = ips.subList(i * subRangeSize, rightBound);
+                Runnable task = new IPRangeScannerTask(threadIps);
                 executorService.execute(task);
-            }
 
+                if ((i + 1) * subRangeSize > ips.size() - 1) break;
+            }
             executorService.shutdown();
         } catch (Exception e) {
             System.err.println("Ошибка при разделении диапазона IP-адресов: " + e.getMessage());
         }
     }
 
-    private static long ipToLong(String ipAddress) {
-        String[] octets = ipAddress.split("\\.");
-        long result = 0;
-        for (int i = 0; i < 4; i++) {
-            result += Long.parseLong(octets[i]) << (24 - (8 * i));
-        }
-        return result;
-    }
+    private static List<String> getIps(String ipWithMask) {
+        try {
+            String[] parts = ipWithMask.split("/");
+            String baseIP = parts[0];
+            int subnetMask = Integer.parseInt(parts[1]);
 
-    private static String longToIP(long ipAddress) {
-        StringBuilder sb = new StringBuilder(15);
-        for (int i = 0; i < 4; i++) {
-            sb.insert(0, ipAddress & 0xff);
-            if (i < 3) {
-                sb.insert(0, '.');
+            InetAddress inetAddress = InetAddress.getByName(baseIP);
+            byte[] ipBytes = inetAddress.getAddress();
+
+            int[] ip = new int[4];
+            for (int i = 0; i < 4; i++) {
+                ip[i] = ipBytes[i] & 0xFF;
             }
-            ipAddress >>= 8;
-        }
-        return sb.toString();
-    }
 
-    private static class IPRangeScannerTask implements Runnable {
-        private final String startIP;
-        private final String endIP;
+            int numberOfAddresses = (int) Math.pow(2, 32 - subnetMask);
 
-        public IPRangeScannerTask(String startIP, String endIP) {
-            this.startIP = startIP;
-            this.endIP = endIP;
-        }
+            List<String> ips = new ArrayList<String>();
 
-        @Override
-        public void run() {
-            Set<String> domainNames = new HashSet<>();
-            for (long ip = ipToLong(startIP); ip <= ipToLong(endIP); ip++) {
-                String ipAddress = longToIP(ip);
-                Set<String> scannedDomains = SSLScanner.scanSSLDomains(ipAddress);
-                if (scannedDomains != null) {
-                    domainNames.addAll(scannedDomains);
+            for (int i = 0; i < numberOfAddresses; i++) {
+                ips.add(ip[0] + "." + ip[1] + "." + ip[2] + "." + ip[3]);
+                ip[3]++;
+                for (int j = 3; j >= 0; j--) {
+                    if (ip[j] > 255) {
+                        ip[j] = 0;
+                        ip[j - 1]++;
+                    }
                 }
             }
-            FileUtil.saveDomainNamesToFile(domainNames);
+            return ips;
+        } catch (UnknownHostException e) {
+            System.out.println(e.getMessage());
+            return null;
         }
-
     }
+
 }
